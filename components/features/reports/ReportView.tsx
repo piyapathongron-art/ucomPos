@@ -7,6 +7,7 @@ import { TopProducts, type TopProduct } from './TopProducts';
 import { TopCategories, type TopCategory } from './TopCategories';
 import { TransactionList } from './TransactionList';
 import { Icons } from '@/components/ui/Icons';
+import { useAuthStore } from '@/store/authStore';
 
 interface AnalyticsData {
   summary: ReportSummary;
@@ -31,6 +32,7 @@ function todayString() {
 }
 
 export function ReportView() {
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
   const [dateRange, setDateRange] = useState<DateRange>({
     from: todayString(),
     to: todayString(),
@@ -66,7 +68,7 @@ export function ReportView() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white">รายงาน</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            สรุปยอดขาย กำไร และสินค้าขายดี
+            สรุปยอดขายและสินค้าขายดี
           </p>
         </div>
         {loading && <Icons.Loader className="w-5 h-5 text-slate-400" />}
@@ -74,14 +76,14 @@ export function ReportView() {
 
       <DateRangePicker value={dateRange} onChange={handleRangeChange} />
 
-      <KPICards summary={analytics?.summary ?? EMPTY_SUMMARY} />
+      <KPICards summary={analytics?.summary ?? EMPTY_SUMMARY} isAdmin={isAdmin ?? false} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TopProducts items={analytics?.topProducts ?? []} />
         <TopCategories items={analytics?.topCategories ?? []} />
       </div>
 
-      <TransactionList dateRange={dateRange} />
+      <TransactionList dateRange={dateRange} isAdmin={isAdmin ?? false} />
     </div>
   );
 }

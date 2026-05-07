@@ -15,9 +15,10 @@ export interface ReportSummary {
 
 interface KPICardsProps {
   summary: ReportSummary;
+  isAdmin: boolean;
 }
 
-export function KPICards({ summary }: KPICardsProps) {
+export function KPICards({ summary, isAdmin }: KPICardsProps) {
   const marginPct =
     summary.revenue > 0
       ? ((summary.profit / summary.revenue) * 100).toFixed(1)
@@ -30,6 +31,7 @@ export function KPICards({ summary }: KPICardsProps) {
       sub: `${summary.saleCount} บิล`,
       color: 'text-blue-600 dark:text-blue-400',
       bg: 'bg-blue-50 dark:bg-blue-900/20',
+      adminOnly: false,
     },
     {
       label: 'กำไรสุทธิ',
@@ -37,6 +39,7 @@ export function KPICards({ summary }: KPICardsProps) {
       sub: `margin ${marginPct}%`,
       color: 'text-emerald-600 dark:text-emerald-400',
       bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+      adminOnly: true,
     },
     {
       label: 'ยอดเฉลี่ย/บิล',
@@ -44,6 +47,7 @@ export function KPICards({ summary }: KPICardsProps) {
       sub: 'ต่อรายการ',
       color: 'text-violet-600 dark:text-violet-400',
       bg: 'bg-violet-50 dark:bg-violet-900/20',
+      adminOnly: false,
     },
     {
       label: 'เงินสด / โอน',
@@ -51,8 +55,9 @@ export function KPICards({ summary }: KPICardsProps) {
       sub: `โอน: ${formatBaht(summary.transferTotal)}`,
       color: 'text-amber-600 dark:text-amber-400',
       bg: 'bg-amber-50 dark:bg-amber-900/20',
+      adminOnly: false,
     },
-  ];
+  ].filter((c) => !c.adminOnly || isAdmin);
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

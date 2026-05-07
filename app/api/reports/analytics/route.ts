@@ -6,7 +6,7 @@ import {
   getTopCategories,
 } from '@/server/services/reportService';
 
-export const GET = requirePermission('report', async (req: NextRequest) => {
+export const GET = requirePermission('report', async (req: NextRequest, user) => {
   const { searchParams } = new URL(req.url);
   const fromStr = searchParams.get('from');
   const toStr = searchParams.get('to');
@@ -26,7 +26,12 @@ export const GET = requirePermission('report', async (req: NextRequest) => {
       getTopCategories(from, to, 10),
     ]);
 
-    return NextResponse.json({ summary, topProducts, topCategories });
+    const sanitizedSummary =
+      user.role === 'ADMIN'
+        ? summary
+        : { ...summary, profit: 0, cost: 0 };
+
+    return NextResponse.json({ summary: sanitizedSummary, topProducts, topCategories });
   } catch (err: unknown) {
     console.error('[GET /api/reports/analytics]', err);
     const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในระบบ';

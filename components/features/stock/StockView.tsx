@@ -9,6 +9,7 @@ import { ConfirmModal } from '@/components/ui/Modal';
 import { ProductForm } from './ProductForm';
 import { BulkImport } from './BulkImport';
 import { useUIStore } from '@/store/uiStore';
+import { useAuthStore } from '@/store/authStore';
 import { useDebounce } from '@/hooks/useDebounce';
 import { formatBaht } from '@/lib/utils';
 import type { Product } from '@/types/domain';
@@ -20,6 +21,7 @@ interface Category {
 
 export function StockView() {
   const showNotification = useUIStore((s) => s.showNotification);
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,7 +158,7 @@ export function StockView() {
                 <th className="px-4 py-3 font-semibold">ชื่อสินค้า</th>
                 <th className="px-4 py-3 font-semibold">หมวดหมู่</th>
                 <th className="px-4 py-3 font-semibold text-right">จำนวน</th>
-                <th className="px-4 py-3 font-semibold text-right">ทุน</th>
+                {isAdmin && <th className="px-4 py-3 font-semibold text-right">ทุน</th>}
                 <th className="px-4 py-3 font-semibold text-right">ราคาขาย</th>
                 <th className="px-4 py-3 font-semibold text-right"></th>
               </tr>
@@ -164,14 +166,14 @@ export function StockView() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {loading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={isAdmin ? 8 : 7} className="px-4 py-8 text-center text-slate-400">
                     <Icons.Loader className="w-5 h-5 mx-auto" />
                   </td>
                 </tr>
               )}
               {!loading && products.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={isAdmin ? 8 : 7} className="px-4 py-8 text-center text-slate-400">
                     ไม่พบสินค้า
                   </td>
                 </tr>
@@ -208,9 +210,11 @@ export function StockView() {
                   >
                     {p.qty}
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-500">
-                    {formatBaht(Number(p.cost))}
-                  </td>
+                  {isAdmin && (
+                    <td className="px-4 py-3 text-right text-slate-500">
+                      {formatBaht(Number(p.cost))}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-right font-semibold">
                     {formatBaht(Number(p.price))}
                   </td>

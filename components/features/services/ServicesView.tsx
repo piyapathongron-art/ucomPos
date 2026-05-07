@@ -7,6 +7,7 @@ import { Icons } from '@/components/ui/Icons';
 import { ConfirmModal } from '@/components/ui/Modal';
 import { ServiceForm } from './ServiceForm';
 import { useUIStore } from '@/store/uiStore';
+import { useAuthStore } from '@/store/authStore';
 import { formatBaht, formatThaiDate } from '@/lib/utils';
 import type { ServiceType, ServiceStatus } from '@/types/domain';
 
@@ -58,6 +59,7 @@ function detailsSummary(type: ServiceType, details: Record<string, unknown> | nu
 
 export function ServicesView() {
   const showNotification = useUIStore((s) => s.showNotification);
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
   const [activeTab, setActiveTab] = useState<Tab>('REPAIR');
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,7 +162,7 @@ export function ServicesView() {
                 <th className="px-4 py-3 font-semibold">ชื่องาน</th>
                 <th className="px-4 py-3 font-semibold">รายละเอียด</th>
                 <th className="px-4 py-3 font-semibold text-right">ราคา</th>
-                <th className="px-4 py-3 font-semibold text-right">กำไร</th>
+                {isAdmin && <th className="px-4 py-3 font-semibold text-right">กำไร</th>}
                 <th className="px-4 py-3 font-semibold text-center">สถานะ</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -168,14 +170,14 @@ export function ServicesView() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {loading && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-400">
                     <Icons.Loader className="w-5 h-5 mx-auto" />
                   </td>
                 </tr>
               )}
               {!loading && services.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-400">
                     ไม่มีรายการ
                   </td>
                 </tr>
@@ -196,9 +198,11 @@ export function ServicesView() {
                     <td className="px-4 py-3 text-right font-semibold">
                       {formatBaht(Number(s.price))}
                     </td>
-                    <td className={`px-4 py-3 text-right ${profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-                      {formatBaht(profit)}
-                    </td>
+                    {isAdmin && (
+                      <td className={`px-4 py-3 text-right ${profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                        {formatBaht(profit)}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[s.status]}`}>
                         {STATUS_LABELS[s.status]}

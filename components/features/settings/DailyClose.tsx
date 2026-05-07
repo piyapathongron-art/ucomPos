@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icons } from '@/components/ui/Icons';
 import { useUIStore } from '@/store/uiStore';
+import { useAuthStore } from '@/store/authStore';
 import { formatBaht, formatThaiDate } from '@/lib/utils';
 import { APP_NAME } from '@/lib/constants';
 
@@ -94,6 +95,7 @@ interface DailyCloseRecord {
 
 export function DailyClose() {
   const showNotification = useUIStore((s) => s.showNotification);
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
   const todayStr = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(todayStr);
   const [summary, setSummary] = useState<SalesSummary | null>(null);
@@ -199,11 +201,11 @@ export function DailyClose() {
           {/* Sales summary */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: 'ยอดเงินสด', value: summary?.cashSales ?? 0, color: 'text-emerald-600 dark:text-emerald-400' },
-              { label: 'ยอดโอน', value: summary?.transferSales ?? 0, color: 'text-blue-600 dark:text-blue-400' },
-              { label: 'กำไรขั้นต้น', value: summary?.grossProfit ?? 0, color: 'text-purple-600 dark:text-purple-400' },
-              { label: 'จำนวนบิล', value: summary?.saleCount ?? 0, color: 'text-slate-700 dark:text-slate-200', isBill: true },
-            ].map((item) => (
+              { label: 'ยอดเงินสด', value: summary?.cashSales ?? 0, color: 'text-emerald-600 dark:text-emerald-400', adminOnly: false },
+              { label: 'ยอดโอน', value: summary?.transferSales ?? 0, color: 'text-blue-600 dark:text-blue-400', adminOnly: false },
+              { label: 'กำไรขั้นต้น', value: summary?.grossProfit ?? 0, color: 'text-purple-600 dark:text-purple-400', adminOnly: true },
+              { label: 'จำนวนบิล', value: summary?.saleCount ?? 0, color: 'text-slate-700 dark:text-slate-200', isBill: true, adminOnly: false },
+            ].filter((item) => !item.adminOnly || isAdmin).map((item) => (
               <div key={item.label} className="rounded-lg border dark:border-slate-700 p-3">
                 <p className="text-xs text-slate-500 dark:text-slate-400">{item.label}</p>
                 <p className={`text-lg font-bold mt-0.5 ${item.color}`}>
@@ -270,24 +272,26 @@ export function DailyClose() {
             )}
           </div>
 
-          {/* Net profit */}
-          <div className="rounded-lg border-2 border-blue-200 dark:border-blue-800 p-4 bg-blue-50 dark:bg-blue-900/20">
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-slate-700 dark:text-slate-200">กำไรสุทธิ</span>
-              <span
-                className={`text-2xl font-bold ${
-                  netProfit >= 0
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-red-600 dark:text-red-400'
-                }`}
-              >
-                {formatBaht(netProfit)}
-              </span>
+          {/* Net profit — admin only */}
+          {isAdmin && (
+            <div className="rounded-lg border-2 border-blue-200 dark:border-blue-800 p-4 bg-blue-50 dark:bg-blue-900/20">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-700 dark:text-slate-200">กำไรสุทธิ</span>
+                <span
+                  className={`text-2xl font-bold ${
+                    netProfit >= 0
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-red-600 dark:text-red-400'
+                  }`}
+                >
+                  {formatBaht(netProfit)}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                กำไรขั้นต้น {formatBaht(summary?.grossProfit ?? 0)} − รายจ่าย {formatBaht(totalExpenses)}
+              </p>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              กำไรขั้นต้น {formatBaht(summary?.grossProfit ?? 0)} − รายจ่าย {formatBaht(totalExpenses)}
-            </p>
-          </div>
+          )}
 
           {/* Notes */}
           <div>

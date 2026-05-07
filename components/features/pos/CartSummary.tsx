@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icons } from '@/components/ui/Icons';
 import { useCartStore } from '@/store/cartStore';
+import { useAuthStore } from '@/store/authStore';
 import { formatBaht } from '@/lib/utils';
 
 interface Props {
@@ -21,6 +22,7 @@ export function CartSummary({ onCheckout }: Props) {
   const total = useCartStore((s) => s.total);
   const profit = useCartStore((s) => s.profit);
   const totalItemDiscount = useCartStore((s) => s.totalItemDiscount);
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
 
   return (
     <Card className="flex flex-col h-full max-h-full">
@@ -148,10 +150,12 @@ export function CartSummary({ onCheckout }: Props) {
             {formatBaht(total())}
           </span>
         </div>
-        <div className="flex justify-between text-xs text-green-600 dark:text-green-400">
-          <span>กำไรประมาณ</span>
-          <span>{formatBaht(profit())}</span>
-        </div>
+        {isAdmin && (
+          <div className="flex justify-between text-xs text-green-600 dark:text-green-400">
+            <span>กำไรประมาณ</span>
+            <span>{formatBaht(profit())}</span>
+          </div>
+        )}
 
         <Button
           onClick={onCheckout}

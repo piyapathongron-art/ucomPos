@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuthStore } from '@/store/authStore';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -47,6 +48,7 @@ const CARRIERS = ['AIS', 'DTAC', 'TRUE', 'NT', 'MVNO', 'อื่นๆ'];
 
 export function ServiceForm({ type, service, onClose, onSaved }: ServiceFormProps) {
   const isEdit = !!service;
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -219,12 +221,14 @@ export function ServiceForm({ type, service, onClose, onSaved }: ServiceFormProp
           />
         </div>
 
-        <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400 px-1">
-          <span>กำไร</span>
-          <span className={profit >= 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-red-500'}>
-            ฿{profit.toLocaleString()}
-          </span>
-        </div>
+        {isAdmin && (
+          <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400 px-1">
+            <span>กำไร</span>
+            <span className={profit >= 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-red-500'}>
+              ฿{profit.toLocaleString()}
+            </span>
+          </div>
+        )}
 
         {isEdit && (
           <div className="w-full">

@@ -36,9 +36,10 @@ const PAGE_SIZE = 20;
 
 interface TransactionListProps {
   dateRange: DateRange;
+  isAdmin: boolean;
 }
 
-export function TransactionList({ dateRange }: TransactionListProps) {
+export function TransactionList({ dateRange, isAdmin }: TransactionListProps) {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -97,7 +98,7 @@ export function TransactionList({ dateRange }: TransactionListProps) {
               <th className="px-4 py-3 font-semibold">พนักงาน</th>
               <th className="px-4 py-3 font-semibold text-center">ชำระ</th>
               <th className="px-4 py-3 font-semibold text-right">ยอดรวม</th>
-              <th className="px-4 py-3 font-semibold text-right">กำไร</th>
+              {isAdmin && <th className="px-4 py-3 font-semibold text-right">กำไร</th>}
               <th className="px-4 py-3 font-semibold text-center">สถานะ</th>
               <th className="px-4 py-3"></th>
             </tr>
@@ -105,14 +106,14 @@ export function TransactionList({ dateRange }: TransactionListProps) {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
             {loading && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-400">
                   <Icons.Loader className="w-5 h-5 mx-auto" />
                 </td>
               </tr>
             )}
             {!loading && sales.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-400">
                   ไม่มีรายการขายในช่วงเวลานี้
                 </td>
               </tr>
@@ -145,9 +146,11 @@ export function TransactionList({ dateRange }: TransactionListProps) {
                 <td className="px-4 py-3 text-right font-semibold text-slate-800 dark:text-white">
                   {formatBaht(Number(sale.total))}
                 </td>
-                <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400">
-                  {formatBaht(Number(sale.profit))}
-                </td>
+                {isAdmin && (
+                  <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400">
+                    {formatBaht(Number(sale.profit))}
+                  </td>
+                )}
                 <td className="px-4 py-3 text-center">
                   {sale.voided ? (
                     <span className="text-xs text-red-500 font-medium">ยกเลิก</span>
@@ -187,13 +190,13 @@ export function TransactionList({ dateRange }: TransactionListProps) {
       )}
 
       {selected && (
-        <SaleDetailModal sale={selected} onClose={() => setSelected(null)} />
+        <SaleDetailModal sale={selected} onClose={() => setSelected(null)} isAdmin={isAdmin} />
       )}
     </Card>
   );
 }
 
-function SaleDetailModal({ sale, onClose }: { sale: Sale; onClose: () => void }) {
+function SaleDetailModal({ sale, onClose, isAdmin }: { sale: Sale; onClose: () => void; isAdmin: boolean }) {
   return (
     <Modal
       title={`บิล #${sale.id.slice(-8).toUpperCase()}`}
@@ -289,10 +292,12 @@ function SaleDetailModal({ sale, onClose }: { sale: Sale; onClose: () => void })
             <span>ยอดสุทธิ</span>
             <span>{formatBaht(Number(sale.total))}</span>
           </div>
-          <div className="flex justify-between text-emerald-600 dark:text-emerald-400 text-xs">
-            <span>กำไร</span>
-            <span>{formatBaht(Number(sale.profit))}</span>
-          </div>
+          {isAdmin && (
+            <div className="flex justify-between text-emerald-600 dark:text-emerald-400 text-xs">
+              <span>กำไร</span>
+              <span>{formatBaht(Number(sale.profit))}</span>
+            </div>
+          )}
         </div>
       </div>
     </Modal>
