@@ -80,28 +80,52 @@ export interface Service {
   userId: string;
 }
 
-export interface Partner {
-  id: string;
-  name: string;
-  phone: string | null;
-  email: string | null;
-  totalDebt: number;
-  totalCommission: number;
-  notes: string | null;
-  isActive: boolean;
-}
+export type InstallmentMode = 'CONSIGNMENT' | 'SELF_MANAGED';
+export type InstallmentStatus =
+  | 'PENDING_COMMISSION'
+  | 'ACTIVE'
+  | 'COMPLETED'
+  | 'CANCELLED';
+export type InstallmentPaymentType = 'COMMISSION' | 'INSTALLMENT';
 
-export type PartnerTxType = 'DEBT' | 'PAYMENT' | 'COMMISSION';
-
-export interface PartnerTransaction {
+export interface InstallmentPayment {
   id: string;
-  partnerId: string;
-  type: PartnerTxType;
+  installmentId: string;
+  type: InstallmentPaymentType;
   amount: number;
-  description: string;
+  profitRecognized: number;
+  paymentMethod: PaymentMethod;
   date: string;
+  notes: string | null;
   userId: string;
   user?: { name: string };
+}
+
+export interface Installment {
+  id: string;
+  mode: InstallmentMode;
+  status: InstallmentStatus;
+  productId: number | null;
+  productSnapshot: {
+    name: string;
+    productCode: string | null;
+    cost: number;
+    price: number;
+  };
+  customerName: string;
+  customerPhone: string | null;
+  customerNote: string | null;
+  cost: number;
+  basePrice: number;
+  totalAmount: number;
+  paidAmount: number;
+  commission: number;
+  date: string;
+  closedAt: string | null;
+  notes: string | null;
+  userId: string;
+  user?: { name: string };
+  payments?: InstallmentPayment[];
 }
 
 export interface AuditLog {

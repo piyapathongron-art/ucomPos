@@ -34,7 +34,8 @@ model User {
 
   sales              Sale[]
   services           Service[]
-  partnerTransactions PartnerTransaction[]
+  installments       Installment[]
+  installmentPayments InstallmentPayment[]
   auditLogs          AuditLog[]
   refreshTokens      RefreshToken[]
 
@@ -87,7 +88,8 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  saleItems SaleItem[]
+  saleItems    SaleItem[]
+  installments Installment[]
 
   @@index([productId])
   @@index([categoryId])
@@ -187,49 +189,80 @@ model Service {
 }
 
 // ============================================================
-// PARTNERS & INSTALLMENTS
+// INSTALLMENTS
 // ============================================================
 
-model Partner {
-  id              String   @id @default(uuid())
-  name            String
-  phone           String?
-  email           String?
-  totalDebt       Decimal  @default(0) @db.Decimal(12, 2)
-  totalCommission Decimal  @default(0) @db.Decimal(12, 2)
+enum InstallmentMode {
+  CONSIGNMENT   // ฝากผ่อน — รอรับคอมมิชชันจากร้านส่ง
+  SELF_MANAGED  // ผ่อนเอง — ร้านรับชำระค่างวดเอง
+}
+
+enum InstallmentStatus {
+  PENDING_COMMISSION   // CONSIGNMENT: รอรับคอมมิชชัน
+  ACTIVE               // SELF_MANAGED: กำลังผ่อน
+  COMPLETED            // จบดิลแล้ว
+  CANCELLED
+}
+
+enum InstallmentPaymentType {
+  COMMISSION    // CONSIGNMENT: เงินคอมมิชชันจากร้านส่ง
+  INSTALLMENT   // SELF_MANAGED: ค่างวดจากลูกค้า
+}
+
+model Installment {
+  id              String            @id @default(uuid())
+  mode            InstallmentMode
+  status          InstallmentStatus @default(ACTIVE)
+
+  productId       Int?
+  product         Product?          @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productSnapshot Json
+
+  customerName    String
+  customerPhone   String?
+  customerNote    String?
+
+  cost            Decimal  @default(0) @db.Decimal(12, 2)
+  basePrice       Decimal  @default(0) @db.Decimal(12, 2)
+  totalAmount     Decimal  @default(0) @db.Decimal(12, 2)
+  paidAmount      Decimal  @default(0) @db.Decimal(12, 2)
+  commission      Decimal  @default(0) @db.Decimal(12, 2)
+
+  date            DateTime  @default(now())
+  closedAt        DateTime?
   notes           String?
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  transactions PartnerTransaction[]
+  payments        InstallmentPayment[]
 
-  @@index([name])
-  @@index([phone])
-  @@index([isActive])
-}
-
-enum PartnerTxType {
-  DEBT
-  PAYMENT
-  COMMISSION
-}
-
-model PartnerTransaction {
-  id          String        @id @default(uuid())
-  partnerId   String
-  partner     Partner       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  type        PartnerTxType
-  amount      Decimal       @db.Decimal(12, 2)
-  description String
-  date        DateTime      @default(now())
-  userId      String
-  user        User          @relation(fields: [userId], references: [id])
-  createdAt   DateTime      @default(now())
-
-  @@index([partnerId])
-  @@index([type])
+  @@index([mode])
+  @@index([status])
   @@index([date])
+  @@index([userId])
+  @@index([customerPhone])
+}
+
+model InstallmentPayment {
+  id               String                 @id @default(uuid())
+  installmentId    String
+  installment      Installment            @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+  type             InstallmentPaymentType
+  amount           Decimal                @db.Decimal(12, 2)
+  profitRecognized Decimal                @default(0) @db.Decimal(12, 2)
+  paymentMethod    PaymentMethod          @default(CASH)
+  date             DateTime               @default(now())
+  notes            String?
+  userId           String
+  user             User                   @relation(fields: [userId], references: [id])
+  createdAt        DateTime               @default(now())
+
+  @@index([installmentId])
+  @@index([date])
+  @@index([type])
+  @@index([paymentMethod])
 }
 
 // ============================================================

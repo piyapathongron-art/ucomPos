@@ -3,19 +3,17 @@ import { requirePermission } from '@/server/middleware/auth';
 import { prisma } from '@/lib/prisma';
 
 export const GET = requirePermission('settings', async (_req: NextRequest) => {
-  const [categories, products, partners, partnerTransactions] = await Promise.all([
+  const [categories, products] = await Promise.all([
     prisma.category.findMany({ orderBy: { order: 'asc' } }),
     prisma.product.findMany({
       include: { category: { select: { name: true } } },
       orderBy: { productId: 'asc' },
     }),
-    prisma.partner.findMany({ orderBy: { name: 'asc' } }),
-    prisma.partnerTransaction.findMany({ orderBy: { date: 'asc' } }),
   ]);
 
   const backup = {
     exportedAt: new Date().toISOString(),
-    version: '2.0',
+    version: '2.1',
     categories,
     products: products.map((p) => ({
       productId: p.productId,
@@ -27,15 +25,6 @@ export const GET = requirePermission('settings', async (_req: NextRequest) => {
       price: Number(p.price),
       isFavorite: p.isFavorite,
       isActive: p.isActive,
-    })),
-    partners: partners.map((p) => ({
-      ...p,
-      totalDebt: Number(p.totalDebt),
-      totalCommission: Number(p.totalCommission),
-    })),
-    partnerTransactions: partnerTransactions.map((t) => ({
-      ...t,
-      amount: Number(t.amount),
     })),
   };
 

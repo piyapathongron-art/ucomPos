@@ -82,26 +82,46 @@ export type ServiceInput = z.infer<typeof serviceSchema>;
 export type ServiceUpdateInput = z.infer<typeof serviceUpdateSchema>;
 
 // ============================================================
-// PARTNER / INSTALLMENT VALIDATORS
+// INSTALLMENT VALIDATORS
 // ============================================================
 
-export const partnerSchema = z.object({
-  name: z.string().min(1, 'กรุณากรอกชื่อ').max(200),
-  phone: z.string().max(20).optional(),
-  email: z.string().optional(),
-  notes: z.string().optional(),
+const manualProductSchema = z.object({
+  name: z.string().min(1, 'กรุณากรอกชื่อสินค้า').max(200),
+  productId: z.string().min(1).max(50),
+  categoryId: z.string().uuid().nullable().optional(),
+  cost: z.number().min(0),
+  price: z.number().min(0),
+  description: z.string().optional(),
 });
 
-export const partnerUpdateSchema = partnerSchema.partial();
+export const installmentSchema = z
+  .object({
+    mode: z.enum(['CONSIGNMENT', 'SELF_MANAGED']),
+    productId: z.number().int().nullable().optional(),
+    manualProduct: manualProductSchema.nullable().optional(),
+    customerName: z.string().min(1, 'กรุณากรอกชื่อลูกค้า').max(200),
+    customerPhone: z.string().max(20).nullable().optional(),
+    customerNote: z.string().max(500).nullable().optional(),
+    totalAmount: z.number().min(0).optional(),
+    notes: z.string().max(500).nullable().optional(),
+  })
+  .refine(
+    (v) => v.productId != null || v.manualProduct != null,
+    { message: 'ต้องเลือกสินค้าหรือเพิ่มข้อมูลเครื่องใหม่' }
+  )
+  .refine(
+    (v) => v.mode !== 'SELF_MANAGED' || (v.totalAmount ?? 0) > 0,
+    { message: 'ผ่อนเอง: ต้องระบุยอดรวมที่ลูกค้าต้องจ่าย', path: ['totalAmount'] }
+  );
 
-export const partnerTransactionSchema = z.object({
-  type: z.enum(['DEBT', 'PAYMENT', 'COMMISSION']),
+export const installmentPaymentSchema = z.object({
   amount: z.number().positive('จำนวนเงินต้องมากกว่า 0'),
-  description: z.string().min(1, 'กรุณากรอกรายละเอียด').max(500),
+  paymentMethod: z.enum(['CASH', 'TRANSFER']),
+  notes: z.string().max(500).nullable().optional(),
 });
 
-export type PartnerInput = z.infer<typeof partnerSchema>;
-export type PartnerTransactionInput = z.infer<typeof partnerTransactionSchema>;
+export type InstallmentInput = z.infer<typeof installmentSchema>;
+export type InstallmentPaymentInput = z.infer<typeof installmentPaymentSchema>;
 
 // ============================================================
 // USER VALIDATORS

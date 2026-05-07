@@ -10,40 +10,80 @@ function saleDateWhere(from?: Date, to?: Date) {
   return where;
 }
 
+function paymentDateWhere(from?: Date, to?: Date) {
+  const where: { date?: { gte?: Date; lte?: Date } } = {};
+  if (from || to) where.date = { gte: from, lte: to };
+  return where;
+}
+
 export async function getRangeSummary(from?: Date, to?: Date) {
   const where = saleDateWhere(from, to);
+  const payWhere = paymentDateWhere(from, to);
 
-  const [agg, cashAgg, transferAgg] = await Promise.all([
-    prisma.sale.aggregate({
-      where,
-      _sum: { total: true, profit: true, cost: true },
-      _count: { id: true },
-    }),
-    prisma.sale.aggregate({
-      where: { ...where, paymentMethod: 'CASH' },
-      _sum: { total: true },
-      _count: { id: true },
-    }),
-    prisma.sale.aggregate({
-      where: { ...where, paymentMethod: 'TRANSFER' },
-      _sum: { total: true },
-      _count: { id: true },
-    }),
-  ]);
+  const [agg, cashAgg, transferAgg, instAgg, instCashAgg, instTransferAgg] =
+    await Promise.all([
+      prisma.sale.aggregate({
+        where,
+        _sum: { total: true, profit: true, cost: true },
+        _count: { id: true },
+      }),
+      prisma.sale.aggregate({
+        where: { ...where, paymentMethod: 'CASH' },
+        _sum: { total: true },
+        _count: { id: true },
+      }),
+      prisma.sale.aggregate({
+        where: { ...where, paymentMethod: 'TRANSFER' },
+        _sum: { total: true },
+        _count: { id: true },
+      }),
+      prisma.installmentPayment.aggregate({
+        where: payWhere,
+        _sum: { amount: true, profitRecognized: true },
+        _count: { id: true },
+      }),
+      prisma.installmentPayment.aggregate({
+        where: { ...payWhere, paymentMethod: 'CASH' },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      prisma.installmentPayment.aggregate({
+        where: { ...payWhere, paymentMethod: 'TRANSFER' },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+    ]);
 
-  const revenue = Number(agg._sum.total ?? 0);
+  const saleRevenue = Number(agg._sum.total ?? 0);
+  const saleProfit = Number(agg._sum.profit ?? 0);
+  const saleCost = Number(agg._sum.cost ?? 0);
   const saleCount = agg._count.id;
+
+  const installmentRevenue = Number(instAgg._sum.amount ?? 0);
+  const installmentProfit = Number(instAgg._sum.profitRecognized ?? 0);
+  const installmentCount = instAgg._count.id;
+
+  const revenue = saleRevenue + installmentRevenue;
+  const profit = saleProfit + installmentProfit;
+  const cashTotal =
+    Number(cashAgg._sum.total ?? 0) + Number(instCashAgg._sum.amount ?? 0);
+  const transferTotal =
+    Number(transferAgg._sum.total ?? 0) +
+    Number(instTransferAgg._sum.amount ?? 0);
 
   return {
     revenue,
-    profit: Number(agg._sum.profit ?? 0),
-    cost: Number(agg._sum.cost ?? 0),
+    profit,
+    cost: saleCost,
     saleCount,
-    avgTicket: saleCount > 0 ? revenue / saleCount : 0,
-    cashTotal: Number(cashAgg._sum.total ?? 0),
-    cashCount: cashAgg._count.id,
-    transferTotal: Number(transferAgg._sum.total ?? 0),
-    transferCount: transferAgg._count.id,
+    avgTicket: saleCount > 0 ? saleRevenue / saleCount : 0,
+    cashTotal,
+    cashCount: cashAgg._count.id + instCashAgg._count.id,
+    transferTotal,
+    transferCount: transferAgg._count.id + instTransferAgg._count.id,
+    installmentRevenue,
+    installmentProfit,
+    installmentCount,
   };
 }
 

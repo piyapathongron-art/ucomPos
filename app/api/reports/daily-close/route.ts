@@ -31,21 +31,37 @@ export const POST = requirePermission('settings', async (req: NextRequest, curre
   const dayEnd = new Date(date + 'T23:59:59');
 
   // Aggregate sales for the day
-  const sales = await prisma.sale.findMany({
-    where: {
-      date: { gte: dayStart, lte: dayEnd },
-      voided: false,
-    },
-    select: { paymentMethod: true, total: true, profit: true },
-  });
+  const [sales, instPayments] = await Promise.all([
+    prisma.sale.findMany({
+      where: {
+        date: { gte: dayStart, lte: dayEnd },
+        voided: false,
+      },
+      select: { paymentMethod: true, total: true, profit: true },
+    }),
+    prisma.installmentPayment.findMany({
+      where: { date: { gte: dayStart, lte: dayEnd } },
+      select: { paymentMethod: true, amount: true, profitRecognized: true },
+    }),
+  ]);
 
-  const cashSales = sales
-    .filter((s) => s.paymentMethod === 'CASH')
-    .reduce((sum, s) => sum + Number(s.total), 0);
-  const transferSales = sales
-    .filter((s) => s.paymentMethod === 'TRANSFER')
-    .reduce((sum, s) => sum + Number(s.total), 0);
-  const grossProfit = sales.reduce((sum, s) => sum + Number(s.profit), 0);
+  const cashSales =
+    sales
+      .filter((s) => s.paymentMethod === 'CASH')
+      .reduce((sum, s) => sum + Number(s.total), 0) +
+    instPayments
+      .filter((p) => p.paymentMethod === 'CASH')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+  const transferSales =
+    sales
+      .filter((s) => s.paymentMethod === 'TRANSFER')
+      .reduce((sum, s) => sum + Number(s.total), 0) +
+    instPayments
+      .filter((p) => p.paymentMethod === 'TRANSFER')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+  const grossProfit =
+    sales.reduce((sum, s) => sum + Number(s.profit), 0) +
+    instPayments.reduce((sum, p) => sum + Number(p.profitRecognized), 0);
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
   const netProfit = grossProfit - totalExpenses;
 
@@ -134,19 +150,35 @@ export const GET = requirePermission('settings', async (req: NextRequest) => {
   });
 
   // Always return live sales summary
-  const sales = await prisma.sale.findMany({
-    where: { date: { gte: dayStart, lte: dayEnd }, voided: false },
-    select: { paymentMethod: true, total: true, profit: true },
-  });
+  const [sales, instPayments] = await Promise.all([
+    prisma.sale.findMany({
+      where: { date: { gte: dayStart, lte: dayEnd }, voided: false },
+      select: { paymentMethod: true, total: true, profit: true },
+    }),
+    prisma.installmentPayment.findMany({
+      where: { date: { gte: dayStart, lte: dayEnd } },
+      select: { paymentMethod: true, amount: true, profitRecognized: true },
+    }),
+  ]);
 
-  const cashSales = sales
-    .filter((s) => s.paymentMethod === 'CASH')
-    .reduce((sum, s) => sum + Number(s.total), 0);
-  const transferSales = sales
-    .filter((s) => s.paymentMethod === 'TRANSFER')
-    .reduce((sum, s) => sum + Number(s.total), 0);
-  const grossProfit = sales.reduce((sum, s) => sum + Number(s.profit), 0);
-  const saleCount = sales.length;
+  const cashSales =
+    sales
+      .filter((s) => s.paymentMethod === 'CASH')
+      .reduce((sum, s) => sum + Number(s.total), 0) +
+    instPayments
+      .filter((p) => p.paymentMethod === 'CASH')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+  const transferSales =
+    sales
+      .filter((s) => s.paymentMethod === 'TRANSFER')
+      .reduce((sum, s) => sum + Number(s.total), 0) +
+    instPayments
+      .filter((p) => p.paymentMethod === 'TRANSFER')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+  const grossProfit =
+    sales.reduce((sum, s) => sum + Number(s.profit), 0) +
+    instPayments.reduce((sum, p) => sum + Number(p.profitRecognized), 0);
+  const saleCount = sales.length + instPayments.length;
 
   return NextResponse.json({
     summary: { cashSales, transferSales, grossProfit, saleCount },

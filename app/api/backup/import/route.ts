@@ -15,7 +15,7 @@ export const POST = requirePermission('settings', async (req: NextRequest, curre
     return NextResponse.json({ error: 'ไฟล์ backup ไม่ถูกรูปแบบ' }, { status: 400 });
   }
 
-  const stats = { categories: 0, products: 0, partners: 0 };
+  const stats = { categories: 0, products: 0 };
 
   try {
     // Upsert categories
@@ -73,52 +73,6 @@ export const POST = requirePermission('settings', async (req: NextRequest, curre
           },
         });
         stats.products++;
-      }
-    }
-
-    // Upsert partners (by id if present)
-    if (Array.isArray(backup.partners)) {
-      for (const partner of backup.partners as Array<{
-        id?: string;
-        name: string;
-        phone?: string;
-        email?: string;
-        notes?: string;
-        totalDebt?: number;
-        totalCommission?: number;
-      }>) {
-        if (partner.id) {
-          await prisma.partner.upsert({
-            where: { id: partner.id },
-            create: {
-              id: partner.id,
-              name: partner.name,
-              phone: partner.phone ?? null,
-              email: partner.email ?? null,
-              notes: partner.notes ?? null,
-              totalDebt: partner.totalDebt ?? 0,
-              totalCommission: partner.totalCommission ?? 0,
-            },
-            update: {
-              name: partner.name,
-              phone: partner.phone ?? null,
-              email: partner.email ?? null,
-              notes: partner.notes ?? null,
-            },
-          });
-        } else {
-          await prisma.partner.create({
-            data: {
-              name: partner.name,
-              phone: partner.phone ?? null,
-              email: partner.email ?? null,
-              notes: partner.notes ?? null,
-              totalDebt: partner.totalDebt ?? 0,
-              totalCommission: partner.totalCommission ?? 0,
-            },
-          });
-        }
-        stats.partners++;
       }
     }
 

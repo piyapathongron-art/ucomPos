@@ -12,7 +12,6 @@ export function BackupRestore() {
   const [importResult, setImportResult] = useState<{
     categories: number;
     products: number;
-    partners: number;
   } | null>(null);
 
   const handleExport = () => {
@@ -63,7 +62,7 @@ export function BackupRestore() {
             <span className="font-medium">ส่งออกข้อมูล</span>
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            ดาวน์โหลดข้อมูลสินค้า หมวดหมู่ และลูกค้าฝากผ่อนเป็นไฟล์ JSON
+            ดาวน์โหลดข้อมูลสินค้าและหมวดหมู่เป็นไฟล์ JSON
           </p>
           <Button fullWidth onClick={handleExport}>
             <Icons.Download className="w-4 h-4" />
@@ -111,7 +110,6 @@ export function BackupRestore() {
               <p className="font-medium">นำเข้าสำเร็จ</p>
               <p>หมวดหมู่: {importResult.categories} รายการ</p>
               <p>สินค้า: {importResult.products} รายการ</p>
-              <p>ลูกค้า: {importResult.partners} รายการ</p>
             </div>
           )}
         </div>

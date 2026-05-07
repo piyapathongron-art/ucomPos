@@ -3,111 +3,155 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Icons } from '@/components/ui/Icons';
-import { PartnerForm } from './PartnerForm';
-import { PartnerDetail } from './PartnerDetail';
+import { ConfirmModal } from '@/components/ui/Modal';
+import { InstallmentForm } from './InstallmentForm';
+import { InstallmentDetail } from './InstallmentDetail';
 import { useUIStore } from '@/store/uiStore';
-import { formatBaht } from '@/lib/utils';
-import type { PartnerTransaction } from '@/types/domain';
+import { useAuthStore } from '@/store/authStore';
+import { formatBaht, formatThaiDate } from '@/lib/utils';
+import type {
+  Installment,
+  InstallmentMode,
+  InstallmentStatus,
+} from '@/types/domain';
 
-interface Partner {
-  id: string;
-  name: string;
-  phone: string | null;
-  email: string | null;
-  notes: string | null;
-  totalDebt: number;
-  totalCommission: number;
-  isActive: boolean;
-  transactions: PartnerTransaction[];
-}
+const MODE_LABELS: Record<InstallmentMode, string> = {
+  CONSIGNMENT: 'ฝากผ่อน',
+  SELF_MANAGED: 'ผ่อนเอง',
+};
 
-type DetailPartner = Omit<Partner, 'transactions'> & { transactions: PartnerTransaction[] };
+const STATUS_LABELS: Record<InstallmentStatus, string> = {
+  PENDING_COMMISSION: 'รอรับคอมมิชชัน',
+  ACTIVE: 'กำลังผ่อน',
+  COMPLETED: 'จบดิล',
+  CANCELLED: 'ยกเลิก',
+};
+
+const STATUS_STYLES: Record<InstallmentStatus, string> = {
+  PENDING_COMMISSION:
+    'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  ACTIVE:
+    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  COMPLETED:
+    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  CANCELLED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+};
+
+type ListItem = Installment & { _count?: { payments: number } };
 
 export function InstallmentView() {
   const showNotification = useUIStore((s) => s.showNotification);
-  const [partners, setPartners] = useState<Partner[]>([]);
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+
+  const [items, setItems] = useState<ListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Partner | null>(null);
-  const [detail, setDetail] = useState<DetailPartner | null>(null);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<InstallmentStatus | ''>('');
+  const [modeFilter, setModeFilter] = useState<InstallmentMode | ''>('');
+
+  const [showForm, setShowForm] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<ListItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/partners');
+      const params = new URLSearchParams();
+      if (search) params.set('q', search);
+      if (statusFilter) params.set('status', statusFilter);
+      if (modeFilter) params.set('mode', modeFilter);
+      const res = await fetch(`/api/installments?${params.toString()}`);
       const data = await res.json();
-      if (res.ok) setPartners(data.partners ?? []);
+      if (res.ok) setItems(data.installments ?? []);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [search, statusFilter, modeFilter]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const openDetail = async (partner: Partner) => {
-    const res = await fetch(`/api/partners/${partner.id}`);
-    const data = await res.json();
-    if (res.ok) setDetail(data.partner);
+  const handleSaved = async () => {
+    setShowForm(false);
+    await load();
+    showNotification('สร้างบิลผ่อนเรียบร้อย', 'success');
   };
 
-  const refreshDetail = async () => {
-    if (!detail) return;
-    const res = await fetch(`/api/partners/${detail.id}`);
+  const handleCancel = async () => {
+    if (!confirmCancel) return;
+    const res = await fetch(`/api/installments/${confirmCancel.id}`, {
+      method: 'DELETE',
+    });
     const data = await res.json();
     if (res.ok) {
-      setDetail(data.partner);
+      showNotification('ยกเลิกบิลเรียบร้อย', 'success');
+      setConfirmCancel(null);
       await load();
+    } else {
+      showNotification(data.error || 'ยกเลิกไม่สำเร็จ', 'error');
     }
   };
 
-  const handleSaved = async () => {
-    setShowForm(false);
-    setEditing(null);
-    await load();
-    showNotification('บันทึกเรียบร้อย', 'success');
+  const stats = {
+    pendingCommission: items.filter((i) => i.status === 'PENDING_COMMISSION')
+      .length,
+    active: items.filter((i) => i.status === 'ACTIVE').length,
+    activeRemaining: items
+      .filter((i) => i.status === 'ACTIVE')
+      .reduce((s, i) => s + (Number(i.totalAmount) - Number(i.paidAmount)), 0),
   };
-
-  const handleDeactivated = async () => {
-    setDetail(null);
-    await load();
-    showNotification('ปิดบัญชีเรียบร้อย', 'success');
-  };
-
-  const filtered = partners.filter(
-    (p) =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.phone ?? '').includes(search)
-  );
-
-  const totalDebt = partners.reduce((s, p) => s + Number(p.totalDebt), 0);
-  const totalCommission = partners.reduce((s, p) => s + Number(p.totalCommission), 0);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">ฝากผ่อน</h1>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
+            ผ่อนชำระ
+          </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            หนี้รวม {formatBaht(totalDebt)} · ค่าคอมฯ สะสม {formatBaht(totalCommission)}
+            รอคอมมิชชัน {stats.pendingCommission} · กำลังผ่อน {stats.active}
+            {stats.active > 0 && ` · ค้างชำระ ${formatBaht(stats.activeRemaining)}`}
           </p>
         </div>
         <Button onClick={() => setShowForm(true)}>
-          <Icons.Users className="w-4 h-4" />
-          <span>เพิ่มลูกค้า</span>
+          <Icons.CreditCard className="w-4 h-4" />
+          <span>สร้างบิลผ่อน</span>
         </Button>
       </div>
 
-      <Card className="p-4">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="ค้นหาชื่อหรือเบอร์โทร"
-          className="w-full px-3 py-2.5 border rounded-lg text-sm dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <Card className="p-4 flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[200px]">
+          <Input
+            placeholder="ค้นหาชื่อหรือเบอร์ลูกค้า"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          value={modeFilter}
+          onChange={(e) => setModeFilter(e.target.value as InstallmentMode | '')}
+          className="px-3 py-3 border rounded-lg dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white"
+        >
+          <option value="">ทุกรูปแบบ</option>
+          <option value="CONSIGNMENT">ฝากผ่อน</option>
+          <option value="SELF_MANAGED">ผ่อนเอง</option>
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) =>
+            setStatusFilter(e.target.value as InstallmentStatus | '')
+          }
+          className="px-3 py-3 border rounded-lg dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white"
+        >
+          <option value="">ทุกสถานะ</option>
+          <option value="PENDING_COMMISSION">รอคอมมิชชัน</option>
+          <option value="ACTIVE">กำลังผ่อน</option>
+          <option value="COMPLETED">จบดิล</option>
+          <option value="CANCELLED">ยกเลิก</option>
+        </select>
       </Card>
 
       <Card className="overflow-hidden">
@@ -115,86 +159,135 @@ export function InstallmentView() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-850">
               <tr className="text-left text-slate-600 dark:text-slate-300">
-                <th className="px-4 py-3 font-semibold">ชื่อลูกค้า</th>
-                <th className="px-4 py-3 font-semibold">เบอร์โทร</th>
-                <th className="px-4 py-3 font-semibold text-right">หนี้คงเหลือ</th>
-                <th className="px-4 py-3 font-semibold text-right">ค่าคอมฯ สะสม</th>
+                <th className="px-4 py-3 font-semibold">วันที่</th>
+                <th className="px-4 py-3 font-semibold">ลูกค้า</th>
+                <th className="px-4 py-3 font-semibold">เครื่อง</th>
+                <th className="px-4 py-3 font-semibold">รูปแบบ</th>
+                <th className="px-4 py-3 font-semibold text-right">ยอด/คงเหลือ</th>
+                <th className="px-4 py-3 font-semibold text-center">สถานะ</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {loading && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                     <Icons.Loader className="w-5 h-5 mx-auto" />
                   </td>
                 </tr>
               )}
-              {!loading && filtered.length === 0 && (
+              {!loading && items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                    {search ? 'ไม่พบลูกค้าที่ค้นหา' : 'ยังไม่มีข้อมูลลูกค้า'}
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                    ยังไม่มีบิลผ่อน
                   </td>
                 </tr>
               )}
-              {filtered.map((p) => (
-                <tr
-                  key={p.id}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-750 cursor-pointer"
-                  onClick={() => openDetail(p)}
-                >
-                  <td className="px-4 py-3 font-medium text-slate-800 dark:text-white">
-                    {p.name}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
-                    {p.phone || '-'}
-                  </td>
-                  <td
-                    className={`px-4 py-3 text-right font-semibold ${
-                      Number(p.totalDebt) > 0
-                        ? 'text-red-600 dark:text-red-400'
-                        : 'text-slate-400'
-                    }`}
+              {items.map((it) => {
+                const remaining =
+                  Number(it.totalAmount) - Number(it.paidAmount);
+                return (
+                  <tr
+                    key={it.id}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-750 cursor-pointer"
+                    onClick={() => setDetailId(it.id)}
                   >
-                    {formatBaht(Number(p.totalDebt))}
-                  </td>
-                  <td className="px-4 py-3 text-right text-blue-600 dark:text-blue-400 font-medium">
-                    {formatBaht(Number(p.totalCommission))}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Icons.ChevronRight className="w-4 h-4 text-slate-400 inline" />
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                      {formatThaiDate(it.date)}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-white">
+                      {it.customerName}
+                      {it.customerPhone && (
+                        <div className="text-xs text-slate-400">
+                          {it.customerPhone}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">
+                      {it.productSnapshot?.name ?? '-'}
+                      {it.productSnapshot?.productCode && (
+                        <div className="font-mono">
+                          {it.productSnapshot.productCode}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                      {MODE_LABELS[it.mode]}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {it.mode === 'SELF_MANAGED' ? (
+                        <>
+                          <div className="font-semibold">
+                            {formatBaht(Number(it.totalAmount))}
+                          </div>
+                          {it.status === 'ACTIVE' && (
+                            <div className="text-xs text-red-500">
+                              เหลือ {formatBaht(remaining)}
+                            </div>
+                          )}
+                        </>
+                      ) : it.status === 'COMPLETED' ? (
+                        <div className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          คอม {formatBaht(Number(it.commission))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                          STATUS_STYLES[it.status]
+                        }`}
+                      >
+                        {STATUS_LABELS[it.status]}
+                      </span>
+                    </td>
+                    <td
+                      className="px-4 py-3 text-right whitespace-nowrap"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {(it.status === 'PENDING_COMMISSION' ||
+                        it.status === 'ACTIVE') &&
+                        isAdmin && (
+                          <button
+                            onClick={() => setConfirmCancel(it)}
+                            className="px-2 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-xs"
+                          >
+                            ยกเลิก
+                          </button>
+                        )}
+                      <Icons.ChevronRight className="w-4 h-4 text-slate-400 inline" />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </Card>
 
-      {(showForm || editing) && (
-        <PartnerForm
-          partner={editing}
-          onClose={() => {
-            setShowForm(false);
-            setEditing(null);
+      {showForm && (
+        <InstallmentForm onClose={() => setShowForm(false)} onSaved={handleSaved} />
+      )}
+
+      {detailId && (
+        <InstallmentDetail
+          installmentId={detailId}
+          onClose={() => setDetailId(null)}
+          onChanged={async () => {
+            await load();
           }}
-          onSaved={handleSaved}
         />
       )}
 
-      {detail && (
-        <PartnerDetail
-          partner={detail}
-          onClose={() => setDetail(null)}
-          onEdit={() => {
-            setEditing(detail as unknown as Partner);
-            setDetail(null);
-          }}
-          onDeactivated={handleDeactivated}
-          onTransactionRecorded={async () => {
-            showNotification('บันทึกรายการเรียบร้อย', 'success');
-            await refreshDetail();
-          }}
+      {confirmCancel && (
+        <ConfirmModal
+          title="ยกเลิกบิลผ่อน"
+          message={`ต้องการยกเลิกบิลของ "${confirmCancel.customerName}"? เครื่องจะถูกคืนเข้าสต็อก`}
+          confirmLabel="ยกเลิกบิล"
+          onConfirm={handleCancel}
+          onCancel={() => setConfirmCancel(null)}
         />
       )}
     </div>
